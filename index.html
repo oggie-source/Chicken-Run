@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duck Jump and Tic Tac Toe Game</title>
+    <style>
+        @import url('file:///C:/Users/ADVAITA/Desktop/tic%20tac%20toe.html');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(to bottom right, lightblue, pink);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #homeScreen, #introScreen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: linear-gradient(to bottom right, lightblue, pink);
+        }
+        #homeScreen {
+            display: block;
+        }
+        #introScreen, #gameContainer {
+            display: none;
+        }
+        #gameContainer {
+            width: 100vw;
+            height: 100vh;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #score {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            font-family: 'Signore', sans-serif;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        #highScore {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-family: 'Signore', sans-serif;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        #restartButton {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-family: 'Signore', sans-serif;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: none;
+            cursor: pointer;
+        }
+        #playButton {
+            font-size: 36px;
+            font-family: 'Signore', sans-serif;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px 40px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        #duck {
+            position: absolute;
+            width: 50px;
+            height: 120px;
+            background: yellow;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            position: relative;
+        }
+        #duck::before {
+            content: '';
+            position: absolute;
+            top: 30px;
+            left: 15px;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+        }
+        #duck::after {
+            content: '';
+            position: absolute;
+            top: 40px;
+            left: 50px;
+            width: 30px;
+            height: 20px;
+            background: orange;
+            border-radius: 50%;
+        }
+        .obstacle {
+            position: absolute;
+            width: 30px;
+            height: 80px;
+            background: red;
+        }
+        .floating-obstacle {
+            height: 150px;
+        }
+        #ticTacToeButton {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 18px;
+            font-family: 'Signore', sans-serif;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<div id="score">Score: 0</div>
+<div id="highScore">Score: 0</div>
+<div id="restartButton" onclick="restartGame()">Restart</div>
+<canvas id="gameCanvas"></canvas>
+<button id="ticTacToeButton" onclick="openTicTacToe()">Play Tic Tac Toe</button>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const context = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let duck = {
+        x: 50,
+        y: canvas.height - 170,
+        width: 50,
+        height: 120,
+        dy: 0,
+        gravity: 0.5,
+        lift: -15,
+        isDucking: false,
+        onGround: false
+    };
+
+    let obstacles = [];
+    let clouds = [];
+    let frameCount = 0;
+    let speed = 2;
+    let score = 0;
+    let highScore = 0;
+    let gameOver = false;
+
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            if (duck.onGround && !duck.isDucking) {
+                duck.dy = duck.lift;
+                duck.onGround = false;
+            }
+        } else if (e.code === 'ArrowDown') {
+            duck.isDucking = true;
+            duck.height = 50;
+            duck.width = 60;
+        }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (e.code === 'ArrowDown') {
+            duck.isDucking = false;
+            duck.height = 120;
+            duck.width = 50;
+        }
+    });
+
+    function generateObstacles() {
+        const colors = ['red', 'green', 'blue', 'purple'];
+        let previousX = 0;
+        for (let i = 1; i <= 20; i++) {
+            const isFloating = Math.random() < 0.5;
+            const height = isFloating ? 150 : 80;
+            const yPos = isFloating ? canvas.height - 210 : canvas.height - 80;
+            const distance = 200 + Math.random() * 300 + duck.width; // Ensure minimum distance is duck.width
+            previousX += distance;
+            obstacles.push({
+                x: previousX,
+                y: yPos,
+                width: 30,
+                height: height,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                isFloating: isFloating
+            });
+        }
+    }
+
+    function generateClouds() {
+        for (let i = 0; i < 10; i++) {
+            clouds.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * (canvas.height / 2),
+                width: 100 + Math.random() * 100,
+                height: 50 + Math.random() * 30,
+                opacity: 0.5 + Math.random() * 0.5
+            });
+        }
+    }
+
+    function drawBackground() {
+        // Draw hills
+        context.fillStyle = 'grey';
+        context.beginPath();
+        context.moveTo(0, canvas.height);
+        context.lineTo(0, canvas.height - 100);
+        context.lineTo(200, canvas.height - 300);
+        context.lineTo(400, canvas.height - 150);
+        context.lineTo(600, canvas.height - 350);
+        context.lineTo(800, canvas.height - 100);
+        context.lineTo(canvas.width, canvas.height);
+        context.closePath();
+        context.fill();
+
+        // Draw sun
+        context.fillStyle = 'yellow';
+        context.beginPath();
+        context.arc(canvas.width - 100, 100, 50, 0, Math.PI * 2);
+        context.fill();
+    }
+
+    function drawDuck() {
+        context.fillStyle = 'yellow';
+        context.fillRect(duck.x, duck.y, duck.width, duck.height);
+
+        // Draw eyes
+        context.fillStyle = 'black';  // Changed eyes color to black
+        context.beginPath();
+        context.arc(duck.x + 20, duck.y + 30, 5, 0, Math.PI * 2);
+        context.fill();
+
+        // Draw beak
+        context.fillStyle = 'orange';
+        context.beginPath();
+        context.moveTo(duck.x + 50, duck.y + 40);
+        context.lineTo(duck.x + 80, duck.y + 50);
+        context.lineTo(duck.x + 50, duck.y + 60);
+        context.fill();
+
+        // Draw legs
+        context.fillStyle = 'orange';  // Leg color
+            context.fillRect(duck.x + 10, duck.y + 120, 5, 20);
+            context.fillRect(duck.x + 35, duck.y + 120, 5, 20);
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(obstacle => {
+                context.fillStyle = obstacle.color;
+                context.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+        }
+
+        function drawClouds() {
+            clouds.forEach(cloud => {
+                context.fillStyle = `rgba(255, 255, 255, ${cloud.opacity})`;
+                context.fillRect(cloud.x, cloud.y, cloud.width, cloud.height);
+            });
+        }
+
+        function updateDuck() {
+            duck.dy += duck.gravity;
+            duck.y += duck.dy;
+            if (duck.y > canvas.height - duck.height) {
+                duck.y = canvas.height - duck.height;
+                duck.dy = 0;
+                duck.onGround = true;
+            } else {
+                duck.onGround = false;
+            }
+        }
+
+        function updateObstacles() {
+            obstacles.forEach(obstacle => {
+                obstacle.x -= speed;
+            });
+            if (obstacles.length && obstacles[0].x < -30) {
+                obstacles.shift();
+                score++;
+                document.getElementById('score').textContent = `Score: ${score}`;
+                if (score > highScore) {
+                    highScore = score;
+                }
+                const colors = ['red', 'green', 'blue', 'purple'];
+                const isFloating = Math.random() < 0.5;
+                const height = isFloating ? 150 : 80;
+                const yPos = isFloating ? canvas.height - 210 : canvas.height - 80;
+                const distance = 200 + Math.random() * 300 + duck.width; // Ensure minimum distance is duck.width
+                const previousX = obstacles[obstacles.length - 1].x;
+                obstacles.push({
+                    x: previousX + distance,
+                    y: yPos,
+                    width: 30,
+                    height: height,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    isFloating: isFloating
+                });
+            }
+        }
+
+        function updateClouds() {
+            clouds.forEach(cloud => {
+                cloud.x -= speed / 2;
+            });
+            clouds.forEach(cloud => {
+                if (cloud.x < -cloud.width) {
+                    cloud.x = canvas.width + Math.random() * 100;
+                    cloud.y = Math.random() * (canvas.height / 2);
+                    cloud.width = 100 + Math.random() * 100;
+                    cloud.height = 50 + Math.random() * 30;
+                    cloud.opacity = 0.5 + Math.random() * 0.5;
+                }
+            });
+        }
+
+        function detectCollision() {
+            const duckRect = { x: duck.x, y: duck.y, width: duck.width, height: duck.height };
+            for (let i = 0; i < obstacles.length; i++) {
+                const obstacleRect = obstacles[i];
+                if (duckRect.x < obstacleRect.x + obstacleRect.width &&
+                    duckRect.x + duckRect.width > obstacleRect.x &&
+                    duckRect.y < obstacleRect.y + obstacleRect.height &&
+                    duckRect.y + duckRect.height > obstacleRect.y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function gameLoop() {
+            if (gameOver) return;
+
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawBackground();
+
+            if (detectCollision()) {
+                gameOver = true;
+                const highScoreDiv = document.getElementById('highScore');
+                highScoreDiv.textContent = `Score: ${score}`;
+                highScoreDiv.style.display = 'block';
+                document.getElementById('restartButton').style.display = 'block';
+                return;
+            }
+
+            drawClouds();
+            drawDuck();
+            drawObstacles();
+            updateDuck();
+            updateObstacles();
+            updateClouds();
+
+            frameCount++;
+            if (frameCount % 500 === 0) {
+                speed += 0.5;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function restartGame() {
+            score = 0;
+            speed = 2;
+            frameCount = 0;
+            duck.y = canvas.height - 170;
+            duck.dy = 0;
+            obstacles = [];
+            generateObstacles();
+            document.getElementById('score').textContent = `Score: ${score}`;
+            document.getElementById('highScore').style.display = 'none';
+            document.getElementById('restartButton').style.display = 'none';
+            gameOver = false;
+            gameLoop();
+        }
+
+        function goToTicTacToe() {
+            window.location.href = 'path/to/your/tic-tac-toe.html';
+        }
+
+        generateObstacles();
+        generateClouds();
+        gameLoop();
+    </script>
+</body>
+</html>
